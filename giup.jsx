@@ -18,6 +18,31 @@ const gMoney = (n) => {
 };
 const gToday = () => new Date().toISOString().split('T')[0];
 
+/* ---------- Date field: explicit Year / Month / Day order ---------- */
+const GDateField = ({ value, onChange, lang }) => {
+  const parts = (value || gToday()).split('-');
+  const [y, m, d] = [parts[0], parts[1], parts[2]];
+  const now = new Date().getFullYear();
+  const years = []; for (let yy = now; yy >= now - 6; yy--) years.push(String(yy));
+  const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+  const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
+  const set = (ny, nm, nd) => onChange(`${ny}-${nm}-${nd}`);
+  const sel = { flex: 1, minWidth: 0 };
+  return (
+    <div className="g-date-field">
+      <select className="g-input" style={sel} value={y} onChange={e => set(e.target.value, m, d)}>
+        {years.map(yy => <option key={yy} value={yy}>{yy}</option>)}
+      </select>
+      <select className="g-input" style={sel} value={m} onChange={e => set(y, e.target.value, d)}>
+        {months.map(mm => <option key={mm} value={mm}>{lang === 'ar' ? 'شهر ' + Number(mm) : 'M' + Number(mm)}</option>)}
+      </select>
+      <select className="g-input" style={sel} value={d} onChange={e => set(y, m, e.target.value)}>
+        {days.map(dd => <option key={dd} value={dd}>{Number(dd)}</option>)}
+      </select>
+    </div>
+  );
+};
+
 const GiupPanel = () => {
   const { giup, saveGiup, lang } = useStore();
   giupLang = lang; // keep module-level money formatter in sync
@@ -83,8 +108,8 @@ const GiupPanel = () => {
       {sub === 'home' && <GiupHome g={g} totals={totals} L={L} lang={lang} />}
       {sub === 'products' && <GiupProducts g={g} addItem={addItem} delItem={delItem} L={L} />}
       {sub === 'sales' && <GiupSales g={g} addItem={addItem} delItem={delItem} L={L} lang={lang} />}
-      {sub === 'expenses' && <GiupExpenses g={g} addItem={addItem} delItem={delItem} update={update} L={L} />}
-      {sub === 'ads' && <GiupAds g={g} addItem={addItem} delItem={delItem} L={L} />}
+      {sub === 'expenses' && <GiupExpenses g={g} addItem={addItem} delItem={delItem} update={update} L={L} lang={lang} />}
+      {sub === 'ads' && <GiupAds g={g} addItem={addItem} delItem={delItem} L={L} lang={lang} />}
       {sub === 'reports' && <GiupReports g={g} totals={totals} inPeriod={inPeriod} L={L} lang={lang} />}
     </div>
   );
@@ -306,7 +331,7 @@ const GiupProducts = ({ g, addItem, delItem, L, lang: panelLang }) => {
           </div>
           <div className="g-field">
             <label className="g-pick-label">{L('Purchase date', 'تاريخ الشراء')}</label>
-            <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            <GDateField value={date} onChange={setDate} lang={lang} />
           </div>
           <button className="g-btn-primary" onClick={save}>{L('Add to inventory', 'أضف للمخزون')}</button>
         </div>
@@ -391,7 +416,7 @@ const GiupSales = ({ g, addItem, delItem, L, lang }) => {
             <input className="g-input" type="number" placeholder={L('Sell price', 'سعر البيع')} value={price} onChange={e => setPrice(e.target.value)} />
             <input className="g-input" type="number" placeholder={L('Qty', 'الكمية')} value={qty} onChange={e => setQty(e.target.value)} />
           </div>
-          <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <GDateField value={date} onChange={setDate} lang={lang} />
           <button className="g-btn-primary" onClick={save}>{L('Save sale', 'حفظ البيعة')}</button>
         </div>
       </div>
@@ -422,7 +447,7 @@ const GiupSales = ({ g, addItem, delItem, L, lang }) => {
 };
 
 /* ============ EXPENSES ============ */
-const GiupExpenses = ({ g, addItem, delItem, update, L }) => {
+const GiupExpenses = ({ g, addItem, delItem, update, L, lang }) => {
   const [name, setName] = gUS('');
   const [price, setPrice] = gUS('');
   const [qty, setQty] = gUS('1');
@@ -451,7 +476,7 @@ const GiupExpenses = ({ g, addItem, delItem, update, L }) => {
             <input className="g-input" type="number" placeholder={L('Price', 'السعر')} value={price} onChange={e => setPrice(e.target.value)} />
             <input className="g-input" type="number" placeholder={L('Qty', 'الكمية')} value={qty} onChange={e => setQty(e.target.value)} />
           </div>
-          <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <GDateField value={date} onChange={setDate} lang={lang} />
           <button className="g-btn-primary" onClick={save}>{L('Save expense', 'حفظ المصروف')}</button>
         </div>
       </div>
@@ -476,7 +501,7 @@ const GiupExpenses = ({ g, addItem, delItem, update, L }) => {
 };
 
 /* ============ ADS ============ */
-const GiupAds = ({ g, addItem, delItem, L }) => {
+const GiupAds = ({ g, addItem, delItem, L, lang }) => {
   const PLATFORMS = ['Facebook', 'Instagram', 'TikTok', 'Google'];
   const [platforms, setPlatforms] = gUS([]);
   const [cost, setCost] = gUS('');
@@ -519,7 +544,7 @@ const GiupAds = ({ g, addItem, delItem, L }) => {
           </div>
           <div className="g-form-row">
             <input className="g-input" type="number" placeholder={L('Cost', 'التكلفة')} value={cost} onChange={e => setCost(e.target.value)} />
-            <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            <GDateField value={date} onChange={setDate} lang={lang} />
           </div>
           <input className="g-input" placeholder={L('Note (optional)', 'ملاحظة (اختياري)')} value={note} onChange={e => setNote(e.target.value)} />
           <button className="g-btn-primary" onClick={save}>{L('Save ad', 'حفظ الإعلان')}</button>

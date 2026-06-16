@@ -419,10 +419,21 @@ function App() {
     else setContent(next);
   }, [db]);
 
-  // Save the whole giup profile (business tracker) to Firebase + state
+  // Save the whole giup profile (business tracker).
+  // State + localStorage update immediately (source of truth for the UI),
+  // Firebase write is best-effort and won't block or revert local changes.
   const saveGiup = useCallback((next) => {
-    setGiup(next);
-    if (db) db.ref('giup').set(next);
+    // Firebase rejects `undefined` anywhere in the payload — strip them out.
+    const clean = JSON.parse(JSON.stringify(next));
+    setGiup(clean);
+    LS.set('giup', clean);
+    if (db) {
+      try {
+        db.ref('giup').set(clean).catch((e) => console.warn('giup Firebase write failed:', e));
+      } catch (e) {
+        console.warn('giup Firebase write threw:', e);
+      }
+    }
   }, [db]);
 
   const store = {

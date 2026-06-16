@@ -44,7 +44,7 @@ const GDateField = ({ value, onChange, lang }) => {
 };
 
 const GiupPanel = () => {
-  const { giup, saveGiup, lang } = useStore();
+  const { giup, saveGiup, lang, toast } = useStore();
   giupLang = lang; // keep module-level money formatter in sync
   const [sub, setSub] = gUS('home');
   const [period, setPeriod] = gUS('month');
@@ -54,9 +54,9 @@ const GiupPanel = () => {
 
   // ---- helpers to mutate + persist ----
   const update = (patch) => saveGiup({ ...g, ...patch });
-  const addItem = (key, item) => update({ [key]: [...(g[key] || []), item] });
-  const addMany = (key, items) => update({ [key]: [...(g[key] || []), ...items] });
-  const delItem = (key, id) => update({ [key]: (g[key] || []).filter(x => x.id !== id) });
+  const addItem = (key, item) => { update({ [key]: [...(g[key] || []), item] }); toast(L('Saved ✓', 'تم الحفظ ✓')); };
+  const addMany = (key, items) => { update({ [key]: [...(g[key] || []), ...items] }); toast(L('Saved ✓', 'تم الحفظ ✓')); };
+  const delItem = (key, id) => { update({ [key]: (g[key] || []).filter(x => x.id !== id) }); toast(L('Deleted', 'تم الحذف')); };
 
   // ---- period filter ----
   const fromDate = gUM(() => {
@@ -290,7 +290,7 @@ const GiupProducts = ({ g, addItem, addMany, delItem, L, lang: panelLang }) => {
               <button key={p.id} type="button"
                 className={'g-pick-card' + (pickId === p.id ? ' on' : '')}
                 onClick={() => onPick(p.id)}>
-                <div className="g-pick-img">{imgOf(p) ? <img src={imgOf(p)} alt="" /> : <span>🛍️</span>}</div>
+                <div className="g-pick-img">{imgOf(p) ? <img src={imgOf(p)} alt="" onError={e=>{e.target.style.display='none';e.target.parentElement.innerHTML='<span>🛍️</span>';}} /> : <span>🛍️</span>}</div>
                 <div className="g-pick-cap">{lang === 'ar' ? p.name.ar : p.name.en}</div>
                 <div className="g-pick-price">{gMoney(p.price)}</div>
               </button>
@@ -300,7 +300,7 @@ const GiupProducts = ({ g, addItem, addMany, delItem, L, lang: panelLang }) => {
           {picked && (
             <>
               <div className="g-pick-selected">
-                {pickedImg && <img src={pickedImg} alt="" />}
+                {pickedImg && <img src={pickedImg} alt="" onError={e=>{e.target.style.display='none';}} />}
                 <div>
                   <div className="g-pick-name">{pickedName}</div>
                   <div className="g-pick-sub">{L('Store price', 'سعر المتجر')}: {gMoney(picked.price)}</div>
@@ -350,7 +350,7 @@ const GiupProducts = ({ g, addItem, addMany, delItem, L, lang: panelLang }) => {
           return (
             <div key={p.id} className="g-list-row">
               <div className="g-list-main g-list-withimg">
-                {p.image && <img className="g-thumb" src={p.image} alt="" />}
+                {p.image && <img className="g-thumb" src={p.image} alt="" onError={e=>{e.target.style.display='none';}} />}
                 <div style={{ minWidth: 0 }}>
                   <div className="g-list-name">
                     {dispName}
@@ -419,7 +419,7 @@ const GiupSales = ({ g, addItem, delItem, L, lang }) => {
                   <button key={p.id} type="button"
                     className={'g-pick-card' + (productId === p.id ? ' on' : '')}
                     onClick={() => onPick(p.id)}>
-                    <div className="g-pick-img">{p.image ? <img src={p.image} alt="" /> : <span>🛍️</span>}</div>
+                    <div className="g-pick-img">{p.image ? <img src={p.image} alt="" onError={e=>{e.target.style.display='none';e.target.parentElement.innerHTML='<span>🛍️</span>';}} /> : <span>🛍️</span>}</div>
                     <div className="g-pick-cap">{baseName}</div>
                     {colorName && <div className="g-pick-color"><span className="g-color-dot sm" style={{ background: p.colorHex }} />{colorName}</div>}
                     <div className="g-pick-price">{stock} {L('left', 'متبقي')}</div>
@@ -444,7 +444,7 @@ const GiupSales = ({ g, addItem, delItem, L, lang }) => {
           return (
             <div key={s.id} className="g-list-row">
               <div className="g-list-main g-list-withimg">
-                {p && p.image && <img className="g-thumb" src={p.image} alt="" />}
+                {p && p.image && <img className="g-thumb" src={p.image} alt="" onError={e=>{e.target.style.display='none';}} />}
                 <div style={{ minWidth: 0 }}>
                   <div className="g-list-name">{p ? giupName(p, lang) : L('Deleted product', 'منتج محذوف')}</div>
                   <div className="g-list-sub">{gMoney(s.price)} × {s.qty} · {s.date}</div>

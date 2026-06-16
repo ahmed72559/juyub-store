@@ -73,6 +73,7 @@ function App() {
   const [sheetUrl, setSheetUrl] = aUS(() => LS.get('sheetUrl', DEFAULT_SHEET_URL));
   const [isAdmin, setIsAdmin] = aUS(() => LS.get('isAdmin', false));
   const [loginOpen, setLoginOpen] = aUS(false);
+  const [giup, setGiup] = aUS(() => LS.get('giup', { products: [], sales: [], expenses: [], ads: [], expenseCategories: [] }));
 
   // Firebase Realtime Database configuration
   const DEFAULT_FIREBASE_CONFIG = {
@@ -173,12 +174,28 @@ function App() {
       }
     });
 
+    // 6. Sync giup (business tracker profile)
+    const giupRef = db.ref('giup');
+    const onGiup = giupRef.on('value', (snap) => {
+      const val = snap.val();
+      if (val) {
+        setGiup({
+          products: val.products || [],
+          sales: val.sales || [],
+          expenses: val.expenses || [],
+          ads: val.ads || [],
+          expenseCategories: val.expenseCategories || [],
+        });
+      }
+    });
+
     return () => {
       productsRef.off('value', onProducts);
       categoriesRef.off('value', onCategories);
       shipRatesRef.off('value', onShipRates);
       contentRef.off('value', onContent);
       ordersRef.off('value', onOrders);
+      giupRef.off('value', onGiup);
     };
   }, [db]);
 
@@ -187,6 +204,7 @@ function App() {
   aUE(() => { LS.set('shipRates', shipRates); }, [shipRates]);
   aUE(() => { LS.set('content', content); }, [content]);
   aUE(() => { LS.set('orders', orders); }, [orders]);
+  aUE(() => { LS.set('giup', giup); }, [giup]);
   aUE(() => { LS.set('creds', creds); }, [creds]);
   aUE(() => { LS.set('sheetUrl', sheetUrl); }, [sheetUrl]);
   aUE(() => { LS.set('isAdmin', isAdmin); }, [isAdmin]);
@@ -401,6 +419,12 @@ function App() {
     else setContent(next);
   }, [db]);
 
+  // Save the whole giup profile (business tracker) to Firebase + state
+  const saveGiup = useCallback((next) => {
+    setGiup(next);
+    if (db) db.ref('giup').set(next);
+  }, [db]);
+
   const store = {
     lang, setLang, dir, route, navigate, t, money,
     cart, addToCart, updateQty, removeItem, subtotal, openCart, closeCart,
@@ -411,7 +435,8 @@ function App() {
     creds, setCreds, saveProduct, deleteProduct, resetProducts, updateOrder, deleteOrder,
     addCategory, deleteCategory, saveShipRate, setAllShipRates, saveContent, resetContent,
     sheetUrl, setSheetUrl,
-    firebaseConfig, setFirebaseConfig, db
+    firebaseConfig, setFirebaseConfig, db,
+    giup, saveGiup
   };
 
   let Page;

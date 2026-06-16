@@ -1,0 +1,484 @@
+const { useState: gUS, useMemo: gUM } = React;
+
+/* ============ JUYUB Business Tracker (جيوب) ============
+   Mirrors the standalone "محفظتي" GIUP profile inside the store dashboard.
+   Data model (stored in Firebase under `giup`):
+     products: [{id, name, buyPrice, sellPrice, qty, colors[], image, createdAt}]
+     sales:    [{id, productId, price, qty, date, note}]
+     expenses: [{id, name, price, qty, date, category}]
+     ads:      [{id, platform, cost, date, note}]
+     expenseCategories: [string]
+==========================================================*/
+
+const gMoney = (n) => Math.round(n).toLocaleString('ar-EG') + ' ج.م';
+const gToday = () => new Date().toISOString().split('T')[0];
+
+const GiupPanel = () => {
+  const { giup, saveGiup, lang } = useStore();
+  const [sub, setSub] = gUS('home');
+  const [period, setPeriod] = gUS('month');
+  const L = (en, ar) => (lang === 'ar' ? ar : en);
+
+  const g = giup || { products: [], sales: [], expenses: [], ads: [], expenseCategories: [] };
+
+  // ---- helpers to mutate + persist ----
+  const update = (patch) => saveGiup({ ...g, ...patch });
+  const addItem = (key, item) => update({ [key]: [...(g[key] || []), item] });
+  const delItem = (key, id) => update({ [key]: (g[key] || []).filter(x => x.id !== id) });
+
+  // ---- period filter ----
+  const fromDate = gUM(() => {
+    const now = new Date();
+    if (period === 'week') { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
+    if (period === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
+    return new Date(2000, 0, 1);
+  }, [period]);
+  const inPeriod = (d) => !d || new Date(d) >= fromDate;
+
+  // ---- totals ----
+  const totals = gUM(() => {
+    const sales = (g.sales || []).filter(s => inPeriod(s.date)).reduce((a, x) => a + x.price * x.qty, 0);
+    const exp = (g.expenses || []).filter(e => inPeriod(e.date)).reduce((a, x) => a + x.price * x.qty, 0);
+    const ads = (g.ads || []).filter(a => inPeriod(a.date)).reduce((a, x) => a + x.cost, 0);
+    const prodCost = period === 'all' ? (g.products || []).reduce((a, p) => a + p.buyPrice * p.qty, 0) : 0;
+    const totalExp = exp + ads + prodCost;
+    return { sales, exp, ads, prodCost, totalExp, profit: sales - totalExp };
+  }, [g, period, fromDate]);
+
+  const tabs = [
+    ['home', '🏠', L('Home', 'الرئيسية')],
+    ['products', '📦', L('Products', 'المنتجات')],
+    ['sales', '💰', L('Sales', 'المبيعات')],
+    ['expenses', '🧾', L('Expenses', 'المصروفات')],
+    ['ads', '📣', L('Ads', 'الإعلانات')],
+    ['reports', '📊', L('Reports', 'التقارير')],
+  ];
+
+  return (
+    <div className="giup-panel">
+      {/* Sub-navigation */}
+      <div className="giup-subnav">
+        {tabs.map(([id, icon, label]) => (
+          <button key={id} className={'giup-subtab' + (sub === id ? ' active' : '')} onClick={() => setSub(id)}>
+            <span className="gst-icon">{icon}</span>{label}
+          </button>
+        ))}
+      </div>
+
+      {/* Period toggle (home + reports) */}
+      {(sub === 'home' || sub === 'reports') && (
+        <div className="giup-period">
+          {[['week', L('Week', 'أسبوع')], ['month', L('Month', 'شهر')], ['all', L('All', 'الكل')]].map(([id, label]) => (
+            <button key={id} className={period === id ? 'active' : ''} onClick={() => setPeriod(id)}>{label}</button>
+          ))}
+        </div>
+      )}
+
+      {sub === 'home' && <GiupHome g={g} totals={totals} L={L} />}
+      {sub === 'products' && <GiupProducts g={g} addItem={addItem} delItem={delItem} L={L} />}
+      {sub === 'sales' && <GiupSales g={g} addItem={addItem} delItem={delItem} L={L} />}
+      {sub === 'expenses' && <GiupExpenses g={g} addItem={addItem} delItem={delItem} update={update} L={L} />}
+      {sub === 'ads' && <GiupAds g={g} addItem={addItem} delItem={delItem} L={L} />}
+      {sub === 'reports' && <GiupReports g={g} totals={totals} inPeriod={inPeriod} L={L} />}
+    </div>
+  );
+};
+
+/* ---------- stock helper ---------- */
+const giupStock = (g, productId) => {
+  const p = (g.products || []).find(x => x.id === productId);
+  if (!p) return 0;
+  const sold = (g.sales || []).filter(s => s.productId === productId).reduce((a, x) => a + x.qty, 0);
+  return p.qty - sold;
+};
+
+/* ============ HOME ============ */
+const GiupHome = ({ g, totals, L }) => {
+  const stat = (label, value, color) => (
+    <div className="g-stat">
+      <div className="g-stat-label">{label}</div>
+      <div className="g-stat-value" style={{ color }}>{gMoney(value)}</div>
+    </div>
+  );
+  return (
+    <>
+      <div className="giup-stats">
+        {stat(L('Total sales', 'إجمالي المبيعات'), totals.sales, 'var(--maroon)')}
+        {stat(L('Total expenses', 'إجمالي المصروفات'), totals.totalExp, '#c0392b')}
+        {stat(L('Net profit', 'صافي الربح'), totals.profit, totals.profit >= 0 ? '#12996a' : '#c0392b')}
+      </div>
+
+      <GiupProfitChart g={g} L={L} />
+
+      <div className="g-card">
+        <div className="g-card-title">📦 {L('Stock', 'المخزون')}</div>
+        {(g.products || []).length === 0 ? (
+          <div className="g-empty">{L('No products yet', 'لا توجد منتجات بعد')}</div>
+        ) : (
+          (g.products || []).map(p => {
+            const stock = giupStock(g, p.id);
+            const color = stock <= 0 ? '#c0392b' : stock <= 3 ? '#d68910' : '#12996a';
+            return (
+              <div key={p.id} className="g-stock-row">
+                <span className="g-stock-name">{p.name}</span>
+                <span className="g-stock-qty" style={{ color }}>{stock} {L('pcs', 'قطعة')}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
+  );
+};
+
+/* ---------- Profit chart (last 7 days) — SVG ---------- */
+const GiupProfitChart = ({ g, L }) => {
+  const data = gUM(() => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const ds = d.toISOString().split('T')[0];
+      const sales = (g.sales || []).filter(x => x.date === ds).reduce((s, x) => s + x.price * x.qty, 0);
+      const exp = (g.expenses || []).filter(x => x.date === ds).reduce((s, x) => s + x.price * x.qty, 0)
+        + (g.ads || []).filter(x => x.date === ds).reduce((s, x) => s + x.cost, 0);
+      days.push({ label: d.toLocaleDateString('ar-EG', { weekday: 'short' }), profit: sales - exp });
+    }
+    return days;
+  }, [g]);
+
+  const W = 600, H = 180, pad = { t: 16, b: 28, l: 12, r: 12 };
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+  const vals = data.map(d => d.profit);
+  const maxV = Math.max(...vals, 1), minV = Math.min(...vals, 0), range = (maxV - minV) || 1;
+  const xStep = cW / (data.length - 1);
+  const yS = v => pad.t + cH - ((v - minV) / range) * cH;
+  const zeroY = yS(0);
+  const pts = data.map((d, i) => `${pad.l + i * xStep},${yS(d.profit)}`).join(' ');
+  const areaPts = `${pad.l},${zeroY} ${pts} ${pad.l + (data.length - 1) * xStep},${zeroY}`;
+
+  return (
+    <div className="g-card">
+      <div className="g-card-title">📈 {L('Daily profit (last 7 days)', 'الأرباح اليومية (آخر ٧ أيام)')}</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+        <line x1={pad.l} y1={zeroY} x2={W - pad.r} y2={zeroY} stroke="var(--line)" strokeDasharray="4 4" />
+        <polygon points={areaPts} fill="rgba(122,31,53,0.10)" />
+        <polyline points={pts} fill="none" stroke="var(--maroon)" strokeWidth="2.5" strokeLinejoin="round" />
+        {data.map((d, i) => {
+          const x = pad.l + i * xStep, y = yS(d.profit);
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r="4" fill={d.profit >= 0 ? '#12996a' : '#c0392b'} />
+              <text x={x} y={H - 8} textAnchor="middle" fontSize="11" fill="var(--ink-soft)" fontFamily="inherit">{d.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
+
+/* ============ PRODUCTS ============ */
+const GiupProducts = ({ g, addItem, delItem, L }) => {
+  const [name, setName] = gUS('');
+  const [buyPrice, setBuy] = gUS('');
+  const [sellPrice, setSell] = gUS('');
+  const [qty, setQty] = gUS('');
+  const [colors, setColors] = gUS('');
+
+  const save = () => {
+    if (!name.trim()) return;
+    if (!(parseInt(qty) > 0)) return;
+    addItem('products', {
+      id: Date.now().toString(),
+      name: name.trim(),
+      buyPrice: parseFloat(buyPrice) || 0,
+      sellPrice: parseFloat(sellPrice) || 0,
+      qty: parseInt(qty) || 0,
+      colors: colors.split(/[,،\/]/).map(s => s.trim()).filter(Boolean),
+      image: null,
+      createdAt: new Date().toISOString(),
+    });
+    setName(''); setBuy(''); setSell(''); setQty(''); setColors('');
+  };
+
+  return (
+    <>
+      <div className="g-card">
+        <div className="g-card-title">➕ {L('Add product to inventory', 'أضف منتج للمخزون')}</div>
+        <div className="g-form">
+          <input className="g-input" placeholder={L('Product name', 'اسم المنتج')} value={name} onChange={e => setName(e.target.value)} />
+          <div className="g-form-row">
+            <input className="g-input" type="number" placeholder={L('Buy price', 'سعر الشراء')} value={buyPrice} onChange={e => setBuy(e.target.value)} />
+            <input className="g-input" type="number" placeholder={L('Sell price', 'سعر البيع')} value={sellPrice} onChange={e => setSell(e.target.value)} />
+          </div>
+          <div className="g-form-row">
+            <input className="g-input" type="number" placeholder={L('Quantity bought', 'الكمية المشتراة')} value={qty} onChange={e => setQty(e.target.value)} />
+            <input className="g-input" placeholder={L('Colors (comma separated)', 'الألوان (افصل بفاصلة)')} value={colors} onChange={e => setColors(e.target.value)} />
+          </div>
+          <button className="g-btn-primary" onClick={save}>{L('Save product', 'حفظ المنتج')}</button>
+        </div>
+      </div>
+
+      <div className="g-card">
+        <div className="g-card-title">📦 {L('Inventory', 'المخزون')} ({(g.products || []).length})</div>
+        {(g.products || []).length === 0 ? (
+          <div className="g-empty">{L('No products yet', 'لا توجد منتجات')}</div>
+        ) : (g.products || []).map(p => {
+          const stock = giupStock(g, p.id);
+          const margin = p.sellPrice - p.buyPrice;
+          return (
+            <div key={p.id} className="g-list-row">
+              <div className="g-list-main">
+                <div className="g-list-name">{p.name}</div>
+                <div className="g-list-sub">
+                  {L('Buy', 'شراء')}: {gMoney(p.buyPrice)} · {L('Sell', 'بيع')}: {gMoney(p.sellPrice)} ·
+                  <span style={{ color: margin >= 0 ? '#12996a' : '#c0392b' }}> {L('Margin', 'الهامش')}: {gMoney(margin)}</span>
+                </div>
+                {p.colors && p.colors.length > 0 && <div className="g-list-sub">{L('Colors', 'الألوان')}: {p.colors.join('، ')}</div>}
+              </div>
+              <div className="g-list-side">
+                <span className="g-stock-pill" style={{ color: stock <= 0 ? '#c0392b' : stock <= 3 ? '#d68910' : '#12996a' }}>{stock} {L('left', 'متبقي')}</span>
+                <button className="g-del" onClick={() => { if (confirm(L('Delete this product?', 'حذف هذا المنتج؟'))) delItem('products', p.id); }}>✕</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+};
+
+/* ============ SALES ============ */
+const GiupSales = ({ g, addItem, delItem, L }) => {
+  const [productId, setProductId] = gUS('');
+  const [price, setPrice] = gUS('');
+  const [qty, setQty] = gUS('1');
+  const [date, setDate] = gUS(gToday());
+
+  const onPick = (id) => {
+    setProductId(id);
+    const p = (g.products || []).find(x => x.id === id);
+    if (p && !price) setPrice(String(p.sellPrice || ''));
+  };
+  const save = () => {
+    if (!productId) return;
+    if (!(parseInt(qty) > 0)) return;
+    addItem('sales', {
+      id: Date.now().toString(),
+      productId,
+      price: parseFloat(price) || 0,
+      qty: parseInt(qty) || 0,
+      date: date || gToday(),
+    });
+    setProductId(''); setPrice(''); setQty('1'); setDate(gToday());
+  };
+  const sorted = [...(g.sales || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return (
+    <>
+      <div className="g-card">
+        <div className="g-card-title">➕ {L('Record a sale', 'سجل بيعة')}</div>
+        <div className="g-form">
+          <select className="g-input" value={productId} onChange={e => onPick(e.target.value)}>
+            <option value="">{L('— choose product —', '— اختر المنتج —')}</option>
+            {(g.products || []).map(p => {
+              const stock = giupStock(g, p.id);
+              return <option key={p.id} value={p.id} disabled={stock <= 0}>{p.name} ({stock} {L('left', 'متبقي')})</option>;
+            })}
+          </select>
+          <div className="g-form-row">
+            <input className="g-input" type="number" placeholder={L('Sell price', 'سعر البيع')} value={price} onChange={e => setPrice(e.target.value)} />
+            <input className="g-input" type="number" placeholder={L('Qty', 'الكمية')} value={qty} onChange={e => setQty(e.target.value)} />
+          </div>
+          <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <button className="g-btn-primary" onClick={save}>{L('Save sale', 'حفظ البيعة')}</button>
+        </div>
+      </div>
+
+      <div className="g-card">
+        <div className="g-card-title">📋 {L('Sales log', 'سجل المبيعات')}</div>
+        {sorted.length === 0 ? <div className="g-empty">{L('No sales yet', 'لا توجد مبيعات')}</div> : sorted.map(s => {
+          const p = (g.products || []).find(x => x.id === s.productId);
+          return (
+            <div key={s.id} className="g-list-row">
+              <div className="g-list-main">
+                <div className="g-list-name">{p ? p.name : L('Deleted product', 'منتج محذوف')}</div>
+                <div className="g-list-sub">{gMoney(s.price)} × {s.qty} · {s.date}</div>
+              </div>
+              <div className="g-list-side">
+                <span className="g-amount" style={{ color: '#12996a' }}>+{gMoney(s.price * s.qty)}</span>
+                <button className="g-del" onClick={() => { if (confirm(L('Delete sale?', 'حذف البيعة؟'))) delItem('sales', s.id); }}>✕</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+};
+
+/* ============ EXPENSES ============ */
+const GiupExpenses = ({ g, addItem, delItem, update, L }) => {
+  const [name, setName] = gUS('');
+  const [price, setPrice] = gUS('');
+  const [qty, setQty] = gUS('1');
+  const [date, setDate] = gUS(gToday());
+
+  const save = () => {
+    if (!name.trim()) return;
+    addItem('expenses', {
+      id: Date.now().toString(),
+      name: name.trim(),
+      price: parseFloat(price) || 0,
+      qty: parseInt(qty) || 1,
+      date: date || gToday(),
+    });
+    setName(''); setPrice(''); setQty('1'); setDate(gToday());
+  };
+  const sorted = [...(g.expenses || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return (
+    <>
+      <div className="g-card">
+        <div className="g-card-title">➕ {L('Add expense', 'أضف مصروف')}</div>
+        <div className="g-form">
+          <input className="g-input" placeholder={L('Expense name', 'اسم المصروف')} value={name} onChange={e => setName(e.target.value)} />
+          <div className="g-form-row">
+            <input className="g-input" type="number" placeholder={L('Price', 'السعر')} value={price} onChange={e => setPrice(e.target.value)} />
+            <input className="g-input" type="number" placeholder={L('Qty', 'الكمية')} value={qty} onChange={e => setQty(e.target.value)} />
+          </div>
+          <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <button className="g-btn-primary" onClick={save}>{L('Save expense', 'حفظ المصروف')}</button>
+        </div>
+      </div>
+
+      <div className="g-card">
+        <div className="g-card-title">🧾 {L('Expenses', 'المصروفات')}</div>
+        {sorted.length === 0 ? <div className="g-empty">{L('No expenses yet', 'لا توجد مصروفات')}</div> : sorted.map(e => (
+          <div key={e.id} className="g-list-row">
+            <div className="g-list-main">
+              <div className="g-list-name">{e.name}</div>
+              <div className="g-list-sub">{gMoney(e.price)} × {e.qty} · {e.date}</div>
+            </div>
+            <div className="g-list-side">
+              <span className="g-amount" style={{ color: '#c0392b' }}>−{gMoney(e.price * e.qty)}</span>
+              <button className="g-del" onClick={() => { if (confirm(L('Delete?', 'حذف؟'))) delItem('expenses', e.id); }}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
+/* ============ ADS ============ */
+const GiupAds = ({ g, addItem, delItem, L }) => {
+  const [platform, setPlatform] = gUS('Facebook');
+  const [cost, setCost] = gUS('');
+  const [date, setDate] = gUS(gToday());
+  const [note, setNote] = gUS('');
+
+  const save = () => {
+    if (!(parseFloat(cost) > 0)) return;
+    addItem('ads', {
+      id: Date.now().toString(),
+      platform,
+      cost: parseFloat(cost) || 0,
+      date: date || gToday(),
+      note: note.trim(),
+    });
+    setCost(''); setNote(''); setDate(gToday());
+  };
+  const sorted = [...(g.ads || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return (
+    <>
+      <div className="g-card">
+        <div className="g-card-title">➕ {L('Add ad spend', 'أضف مصروف إعلان')}</div>
+        <div className="g-form">
+          <div className="g-form-row">
+            <select className="g-input" value={platform} onChange={e => setPlatform(e.target.value)}>
+              <option>Facebook</option><option>Instagram</option><option>TikTok</option>
+              <option>Google</option><option>{L('Other', 'أخرى')}</option>
+            </select>
+            <input className="g-input" type="number" placeholder={L('Cost', 'التكلفة')} value={cost} onChange={e => setCost(e.target.value)} />
+          </div>
+          <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <input className="g-input" placeholder={L('Note (optional)', 'ملاحظة (اختياري)')} value={note} onChange={e => setNote(e.target.value)} />
+          <button className="g-btn-primary" onClick={save}>{L('Save ad', 'حفظ الإعلان')}</button>
+        </div>
+      </div>
+
+      <div className="g-card">
+        <div className="g-card-title">📣 {L('Ad spend log', 'سجل الإعلانات')}</div>
+        {sorted.length === 0 ? <div className="g-empty">{L('No ads yet', 'لا توجد إعلانات')}</div> : sorted.map(a => (
+          <div key={a.id} className="g-list-row">
+            <div className="g-list-main">
+              <div className="g-list-name">{a.platform}</div>
+              <div className="g-list-sub">{a.date}{a.note ? ' · ' + a.note : ''}</div>
+            </div>
+            <div className="g-list-side">
+              <span className="g-amount" style={{ color: '#c0392b' }}>−{gMoney(a.cost)}</span>
+              <button className="g-del" onClick={() => { if (confirm(L('Delete?', 'حذف؟'))) delItem('ads', a.id); }}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
+/* ============ REPORTS ============ */
+const GiupReports = ({ g, totals, inPeriod, L }) => {
+  // profit per product
+  const perProduct = gUM(() => {
+    return (g.products || []).map(p => {
+      const sales = (g.sales || []).filter(s => s.productId === p.id && inPeriod(s.date));
+      const revenue = sales.reduce((a, s) => a + s.price * s.qty, 0);
+      const unitsSold = sales.reduce((a, s) => a + s.qty, 0);
+      const cogs = unitsSold * p.buyPrice;
+      return { name: p.name, unitsSold, revenue, profit: revenue - cogs };
+    }).filter(x => x.unitsSold > 0).sort((a, b) => b.profit - a.profit);
+  }, [g, inPeriod]);
+
+  const margin = totals.sales > 0 ? (totals.profit / totals.sales) * 100 : 0;
+
+  const line = (label, value, color) => (
+    <div className="g-report-line">
+      <span>{label}</span>
+      <span style={{ color, fontWeight: 700 }}>{typeof value === 'number' ? gMoney(value) : value}</span>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="g-card">
+        <div className="g-card-title">📊 {L('Summary', 'الملخص')}</div>
+        {line(L('Revenue (sales)', 'الإيرادات (المبيعات)'), totals.sales, '#12996a')}
+        {line(L('Product cost', 'تكلفة المنتجات'), totals.prodCost, '#c0392b')}
+        {line(L('Expenses', 'المصروفات'), totals.exp, '#c0392b')}
+        {line(L('Ad spend', 'مصروف الإعلانات'), totals.ads, '#c0392b')}
+        <div className="g-report-divider" />
+        {line(L('Net profit', 'صافي الربح'), totals.profit, totals.profit >= 0 ? '#12996a' : '#c0392b')}
+        {line(L('Profit margin', 'هامش الربح'), margin.toFixed(1) + '%', margin >= 0 ? '#12996a' : '#c0392b')}
+      </div>
+
+      <div className="g-card">
+        <div className="g-card-title">🏆 {L('Profit per product', 'ربح كل منتج')}</div>
+        {perProduct.length === 0 ? <div className="g-empty">{L('No sales in this period', 'لا مبيعات في هذه الفترة')}</div> : perProduct.map((p, i) => (
+          <div key={i} className="g-list-row">
+            <div className="g-list-main">
+              <div className="g-list-name">{p.name}</div>
+              <div className="g-list-sub">{p.unitsSold} {L('sold', 'مباع')} · {L('revenue', 'إيراد')} {gMoney(p.revenue)}</div>
+            </div>
+            <div className="g-list-side">
+              <span className="g-amount" style={{ color: p.profit >= 0 ? '#12996a' : '#c0392b' }}>{p.profit >= 0 ? '+' : ''}{gMoney(p.profit)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
+Object.assign(window, { GiupPanel });

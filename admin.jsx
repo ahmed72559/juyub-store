@@ -331,6 +331,7 @@ const AdminPage = () => {
           <button className={tab === 'settings' ? 'active' : ''} onClick={() => { setTab('settings'); setEditing(null); }}>{L('Settings', 'الإعدادات')}</button>
           <button className={tab === 'analytics' ? 'active' : ''} onClick={() => { setTab('analytics'); setEditing(null); }}>{L('Analytics', 'الإحصائيات')}</button>
           <button className={tab === 'shipping' ? 'active' : ''} onClick={() => { setTab('shipping'); setEditing(null); }}>{L('Shipping', 'الشحن')}</button>
+          <button className={tab === 'giup' ? 'active' : ''} onClick={() => { setTab('giup'); setEditing(null); }} style={{color: tab==='giup'?'#fff':'#A8324F', fontWeight:700}}>🦘 {L('JUYUB Biz', 'جيوب')}</button>
         </div>
         <div className="a-actions">
           <button className="a-btn" onClick={() => navigate('home')}>{L('View store', 'المتجر')}</button>
@@ -449,6 +450,7 @@ const AdminPage = () => {
         {tab === 'content' && <ContentEditor />}
         {tab === 'analytics' && <AnalyticsPanel />}
         {tab === 'shipping' && <ShippingPanel />}
+        {tab === 'giup' && <GiupPanel />}
       </div>
     </div>
   );

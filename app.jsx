@@ -175,16 +175,21 @@ function App() {
     });
 
     // 6. Sync giup (business tracker profile)
+    const toArr = (v) => {
+      if (!v) return [];
+      if (Array.isArray(v)) return v.filter(Boolean);
+      return Object.values(v).filter(Boolean);
+    };
     const giupRef = db.ref('giup');
     const onGiup = giupRef.on('value', (snap) => {
       const val = snap.val();
       if (val) {
         setGiup({
-          products: val.products || [],
-          sales: val.sales || [],
-          expenses: val.expenses || [],
-          ads: val.ads || [],
-          expenseCategories: val.expenseCategories || [],
+          products: toArr(val.products),
+          sales: toArr(val.sales),
+          expenses: toArr(val.expenses),
+          ads: toArr(val.ads),
+          expenseCategories: toArr(val.expenseCategories),
         });
       }
     });
@@ -421,8 +426,16 @@ function App() {
 
   // Save the whole giup profile (business tracker).
   const saveGiup = useCallback((next) => {
-    // Firebase rejects `undefined` anywhere in the payload — strip them out.
-    const clean = JSON.parse(JSON.stringify(next));
+    // Ensure all keys are real arrays (not Firebase-returned objects), strip undefined
+    const toArr = (v) => Array.isArray(v) ? v : (v ? Object.values(v).filter(Boolean) : []);
+    const normalized = {
+      products: toArr(next.products),
+      sales: toArr(next.sales),
+      expenses: toArr(next.expenses),
+      ads: toArr(next.ads),
+      expenseCategories: toArr(next.expenseCategories),
+    };
+    const clean = JSON.parse(JSON.stringify(normalized));
     setGiup(clean);
     LS.set('giup', clean);
     if (db) {

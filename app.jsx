@@ -323,9 +323,9 @@ function App() {
 
   // --- admin ---
   const login = useCallback((u, p) => {
-    if (u.trim() === creds.user && p === creds.pass) { setIsAdmin(true); setLoginOpen(false); return true; }
+    if (u.trim() === creds.user && p === creds.pass) { setIsAdmin(true); setLoginOpen(false); navigate('admin'); return true; }
     return false;
-  }, [creds]);
+  }, [creds, navigate]);
   const logout = useCallback(() => { setIsAdmin(false); navigate('home'); }, [navigate]);
 
   const saveProduct = useCallback((prod) => {
@@ -420,19 +420,28 @@ function App() {
   }, [db]);
 
   // Save the whole giup profile (business tracker).
-  // State + localStorage update immediately (source of truth for the UI),
-  // Firebase write is best-effort and won't block or revert local changes.
   const saveGiup = useCallback((next) => {
     // Firebase rejects `undefined` anywhere in the payload — strip them out.
     const clean = JSON.parse(JSON.stringify(next));
     setGiup(clean);
     LS.set('giup', clean);
     if (db) {
-      try {
-        db.ref('giup').set(clean).catch((e) => console.warn('giup Firebase write failed:', e));
-      } catch (e) {
-        console.warn('giup Firebase write threw:', e);
-      }
+      db.ref('giup').set(clean)
+        .then(() => console.log('✅ giup saved to Firebase'))
+        .catch((e) => console.error('❌ giup Firebase write FAILED:', e && e.message));
+    } else {
+      // db not ready yet — keep it pending so it writes once connected
+      window._giupPending = clean;
+      console.warn('⏳ db not ready, giup write queued');
+    }
+  }, [db]);
+
+  // Flush any pending giup write once Firebase connects
+  aUE(() => {
+    if (db && window._giupPending) {
+      db.ref('giup').set(window._giupPending)
+        .then(() => { console.log('✅ pending giup flushed'); window._giupPending = null; })
+        .catch((e) => console.error('❌ pending giup flush failed:', e && e.message));
     }
   }, [db]);
 

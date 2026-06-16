@@ -55,6 +55,7 @@ const GiupPanel = () => {
   // ---- helpers to mutate + persist ----
   const update = (patch) => saveGiup({ ...g, ...patch });
   const addItem = (key, item) => update({ [key]: [...(g[key] || []), item] });
+  const addMany = (key, items) => update({ [key]: [...(g[key] || []), ...items] });
   const delItem = (key, id) => update({ [key]: (g[key] || []).filter(x => x.id !== id) });
 
   // ---- period filter ----
@@ -106,7 +107,7 @@ const GiupPanel = () => {
       )}
 
       {sub === 'home' && <GiupHome g={g} totals={totals} L={L} lang={lang} />}
-      {sub === 'products' && <GiupProducts g={g} addItem={addItem} delItem={delItem} L={L} />}
+      {sub === 'products' && <GiupProducts g={g} addItem={addItem} addMany={addMany} delItem={delItem} L={L} />}
       {sub === 'sales' && <GiupSales g={g} addItem={addItem} delItem={delItem} L={L} lang={lang} />}
       {sub === 'expenses' && <GiupExpenses g={g} addItem={addItem} delItem={delItem} update={update} L={L} lang={lang} />}
       {sub === 'ads' && <GiupAds g={g} addItem={addItem} delItem={delItem} L={L} lang={lang} />}
@@ -218,8 +219,8 @@ const GiupProfitChart = ({ g, L, lang }) => {
 };
 
 /* ============ PRODUCTS ============ */
-const GiupProducts = ({ g, addItem, delItem, L, lang: panelLang }) => {
-  const { products: siteProducts, lang, saveGiup, giup } = useStore();
+const GiupProducts = ({ g, addItem, addMany, delItem, L, lang: panelLang }) => {
+  const { products: siteProducts, lang } = useStore();
   const [pickId, setPickId] = gUS('');
   const [buyPrice, setBuy] = gUS('');
   const [sellPrice, setSell] = gUS('');
@@ -270,7 +271,7 @@ const GiupProducts = ({ g, addItem, delItem, L, lang: panelLang }) => {
 
     if (entries.length === 0) { alert(L('Enter quantity for at least one color', 'أدخل كمية للون واحد على الأقل')); return; }
 
-    saveGiup({ ...giup, products: [...(giup.products || []), ...entries] });
+    addMany('products', entries);
     setPickId(''); setBuy(''); setSell(''); setColorQty({}); setDate(gToday());
   };
 
@@ -384,7 +385,7 @@ const GiupSales = ({ g, addItem, delItem, L, lang }) => {
   const onPick = (id) => {
     setProductId(id);
     const p = (g.products || []).find(x => x.id === id);
-    if (p && !price) setPrice(String(p.sellPrice || ''));
+    if (p) setPrice(String(p.sellPrice || ''));
   };
   const save = () => {
     if (!productId) return;
@@ -405,13 +406,28 @@ const GiupSales = ({ g, addItem, delItem, L, lang }) => {
       <div className="g-card">
         <div className="g-card-title">➕ {L('Record a sale', 'سجل بيعة')}</div>
         <div className="g-form">
-          <select className="g-input" value={productId} onChange={e => onPick(e.target.value)}>
-            <option value="">{L('— choose product —', '— اختر المنتج —')}</option>
-            {(g.products || []).map(p => {
-              const stock = giupStock(g, p.id);
-              return <option key={p.id} value={p.id} disabled={stock <= 0}>{giupName(p, lang)} ({stock} {L('left', 'متبقي')})</option>;
-            })}
-          </select>
+          <div className="g-pick-label">{L('Choose what you sold', 'اختر اللي بعته')}</div>
+          {(g.products || []).filter(p => giupStock(g, p.id) > 0).length === 0 ? (
+            <div className="g-empty">{L('No products in stock', 'لا توجد منتجات في المخزون')}</div>
+          ) : (
+            <div className="g-pick-grid">
+              {(g.products || []).filter(p => giupStock(g, p.id) > 0).map(p => {
+                const stock = giupStock(g, p.id);
+                const colorName = p.colorEn ? (lang === 'ar' ? (p.colorAr || p.colorEn) : p.colorEn) : null;
+                const baseName = lang === 'ar' ? (p.nameAr || p.name) : (p.nameEn || p.name);
+                return (
+                  <button key={p.id} type="button"
+                    className={'g-pick-card' + (productId === p.id ? ' on' : '')}
+                    onClick={() => onPick(p.id)}>
+                    <div className="g-pick-img">{p.image ? <img src={p.image} alt="" /> : <span>🛍️</span>}</div>
+                    <div className="g-pick-cap">{baseName}</div>
+                    {colorName && <div className="g-pick-color"><span className="g-color-dot sm" style={{ background: p.colorHex }} />{colorName}</div>}
+                    <div className="g-pick-price">{stock} {L('left', 'متبقي')}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="g-form-row">
             <input className="g-input" type="number" placeholder={L('Sell price', 'سعر البيع')} value={price} onChange={e => setPrice(e.target.value)} />
             <input className="g-input" type="number" placeholder={L('Qty', 'الكمية')} value={qty} onChange={e => setQty(e.target.value)} />

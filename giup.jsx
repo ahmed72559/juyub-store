@@ -74,12 +74,12 @@ const GiupPanel = () => {
         </div>
       )}
 
-      {sub === 'home' && <GiupHome g={g} totals={totals} L={L} />}
+      {sub === 'home' && <GiupHome g={g} totals={totals} L={L} lang={lang} />}
       {sub === 'products' && <GiupProducts g={g} addItem={addItem} delItem={delItem} L={L} />}
-      {sub === 'sales' && <GiupSales g={g} addItem={addItem} delItem={delItem} L={L} />}
+      {sub === 'sales' && <GiupSales g={g} addItem={addItem} delItem={delItem} L={L} lang={lang} />}
       {sub === 'expenses' && <GiupExpenses g={g} addItem={addItem} delItem={delItem} update={update} L={L} />}
       {sub === 'ads' && <GiupAds g={g} addItem={addItem} delItem={delItem} L={L} />}
-      {sub === 'reports' && <GiupReports g={g} totals={totals} inPeriod={inPeriod} L={L} />}
+      {sub === 'reports' && <GiupReports g={g} totals={totals} inPeriod={inPeriod} L={L} lang={lang} />}
     </div>
   );
 };
@@ -92,8 +92,15 @@ const giupStock = (g, productId) => {
   return p.qty - sold;
 };
 
+/* ---------- localized product name ---------- */
+const giupName = (p, lang) => {
+  if (!p) return '';
+  if (lang === 'ar') return p.nameAr || p.name || p.nameEn || '';
+  return p.nameEn || p.name || p.nameAr || '';
+};
+
 /* ============ HOME ============ */
-const GiupHome = ({ g, totals, L }) => {
+const GiupHome = ({ g, totals, L, lang }) => {
   const stat = (label, value, color) => (
     <div className="g-stat">
       <div className="g-stat-label">{label}</div>
@@ -120,7 +127,7 @@ const GiupHome = ({ g, totals, L }) => {
             const color = stock <= 0 ? '#c0392b' : stock <= 3 ? '#d68910' : '#12996a';
             return (
               <div key={p.id} className="g-stock-row">
-                <span className="g-stock-name">{p.name}</span>
+                <span className="g-stock-name">{giupName(p, lang)}</span>
                 <span className="g-stock-qty" style={{ color }}>{stock} {L('pcs', 'قطعة')}</span>
               </div>
             );
@@ -179,43 +186,71 @@ const GiupProfitChart = ({ g, L }) => {
 
 /* ============ PRODUCTS ============ */
 const GiupProducts = ({ g, addItem, delItem, L }) => {
-  const [name, setName] = gUS('');
+  const { products: siteProducts, lang } = useStore();
+  const [pickId, setPickId] = gUS('');
   const [buyPrice, setBuy] = gUS('');
   const [sellPrice, setSell] = gUS('');
   const [qty, setQty] = gUS('');
-  const [colors, setColors] = gUS('');
+
+  const picked = (siteProducts || []).find(p => p.id === pickId);
+  const pickedImg = picked && picked.variants && picked.variants[0] ? picked.variants[0].img : null;
+  const pickedName = picked ? (lang === 'ar' ? picked.name.ar : picked.name.en) : '';
+
+  const onPick = (id) => {
+    setPickId(id);
+    const p = (siteProducts || []).find(x => x.id === id);
+    if (p && !sellPrice) setSell(String(p.price || ''));
+  };
 
   const save = () => {
-    if (!name.trim()) return;
+    if (!picked) return;
     if (!(parseInt(qty) > 0)) return;
     addItem('products', {
       id: Date.now().toString(),
-      name: name.trim(),
+      siteId: picked.id,
+      name: pickedName,
+      nameEn: picked.name.en,
+      nameAr: picked.name.ar,
       buyPrice: parseFloat(buyPrice) || 0,
-      sellPrice: parseFloat(sellPrice) || 0,
+      sellPrice: parseFloat(sellPrice) || (picked.price || 0),
       qty: parseInt(qty) || 0,
-      colors: colors.split(/[,،\/]/).map(s => s.trim()).filter(Boolean),
-      image: null,
+      image: pickedImg,
       createdAt: new Date().toISOString(),
     });
-    setName(''); setBuy(''); setSell(''); setQty(''); setColors('');
+    setPickId(''); setBuy(''); setSell(''); setQty('');
   };
+
+  // products on the website not yet added to inventory
+  const availableToAdd = (siteProducts || []);
 
   return (
     <>
       <div className="g-card">
-        <div className="g-card-title">➕ {L('Add product to inventory', 'أضف منتج للمخزون')}</div>
+        <div className="g-card-title">➕ {L('Add a product you bought', 'أضف منتج اشتريته')}</div>
         <div className="g-form">
-          <input className="g-input" placeholder={L('Product name', 'اسم المنتج')} value={name} onChange={e => setName(e.target.value)} />
+          <select className="g-input" value={pickId} onChange={e => onPick(e.target.value)}>
+            <option value="">{L('— choose from store products —', '— اختر من منتجات المتجر —')}</option>
+            {availableToAdd.map(p => (
+              <option key={p.id} value={p.id}>{lang === 'ar' ? p.name.ar : p.name.en} — {p.sku}</option>
+            ))}
+          </select>
+
+          {picked && (
+            <div className="g-pick-preview">
+              {pickedImg && <img src={pickedImg} alt="" />}
+              <div>
+                <div className="g-pick-name">{pickedName}</div>
+                <div className="g-pick-sub">{L('Store price', 'سعر المتجر')}: {gMoney(picked.price)}</div>
+              </div>
+            </div>
+          )}
+
           <div className="g-form-row">
-            <input className="g-input" type="number" placeholder={L('Buy price', 'سعر الشراء')} value={buyPrice} onChange={e => setBuy(e.target.value)} />
+            <input className="g-input" type="number" placeholder={L('Buy price (cost)', 'سعر الشراء (التكلفة)')} value={buyPrice} onChange={e => setBuy(e.target.value)} />
             <input className="g-input" type="number" placeholder={L('Sell price', 'سعر البيع')} value={sellPrice} onChange={e => setSell(e.target.value)} />
           </div>
-          <div className="g-form-row">
-            <input className="g-input" type="number" placeholder={L('Quantity bought', 'الكمية المشتراة')} value={qty} onChange={e => setQty(e.target.value)} />
-            <input className="g-input" placeholder={L('Colors (comma separated)', 'الألوان (افصل بفاصلة)')} value={colors} onChange={e => setColors(e.target.value)} />
-          </div>
-          <button className="g-btn-primary" onClick={save}>{L('Save product', 'حفظ المنتج')}</button>
+          <input className="g-input" type="number" placeholder={L('Quantity bought', 'الكمية المشتراة')} value={qty} onChange={e => setQty(e.target.value)} />
+          <button className="g-btn-primary" onClick={save}>{L('Add to inventory', 'أضف للمخزون')}</button>
         </div>
       </div>
 
@@ -226,15 +261,18 @@ const GiupProducts = ({ g, addItem, delItem, L }) => {
         ) : (g.products || []).map(p => {
           const stock = giupStock(g, p.id);
           const margin = p.sellPrice - p.buyPrice;
+          const dispName = p.nameAr && lang === 'ar' ? p.nameAr : (p.nameEn || p.name);
           return (
             <div key={p.id} className="g-list-row">
-              <div className="g-list-main">
-                <div className="g-list-name">{p.name}</div>
-                <div className="g-list-sub">
-                  {L('Buy', 'شراء')}: {gMoney(p.buyPrice)} · {L('Sell', 'بيع')}: {gMoney(p.sellPrice)} ·
-                  <span style={{ color: margin >= 0 ? '#12996a' : '#c0392b' }}> {L('Margin', 'الهامش')}: {gMoney(margin)}</span>
+              <div className="g-list-main g-list-withimg">
+                {p.image && <img className="g-thumb" src={p.image} alt="" />}
+                <div style={{ minWidth: 0 }}>
+                  <div className="g-list-name">{dispName}</div>
+                  <div className="g-list-sub">
+                    {L('Buy', 'شراء')}: {gMoney(p.buyPrice)} · {L('Sell', 'بيع')}: {gMoney(p.sellPrice)} ·
+                    <span style={{ color: margin >= 0 ? '#12996a' : '#c0392b' }}> {L('Margin', 'الهامش')}: {gMoney(margin)}</span>
+                  </div>
                 </div>
-                {p.colors && p.colors.length > 0 && <div className="g-list-sub">{L('Colors', 'الألوان')}: {p.colors.join('، ')}</div>}
               </div>
               <div className="g-list-side">
                 <span className="g-stock-pill" style={{ color: stock <= 0 ? '#c0392b' : stock <= 3 ? '#d68910' : '#12996a' }}>{stock} {L('left', 'متبقي')}</span>
@@ -249,7 +287,7 @@ const GiupProducts = ({ g, addItem, delItem, L }) => {
 };
 
 /* ============ SALES ============ */
-const GiupSales = ({ g, addItem, delItem, L }) => {
+const GiupSales = ({ g, addItem, delItem, L, lang }) => {
   const [productId, setProductId] = gUS('');
   const [price, setPrice] = gUS('');
   const [qty, setQty] = gUS('1');
@@ -283,7 +321,7 @@ const GiupSales = ({ g, addItem, delItem, L }) => {
             <option value="">{L('— choose product —', '— اختر المنتج —')}</option>
             {(g.products || []).map(p => {
               const stock = giupStock(g, p.id);
-              return <option key={p.id} value={p.id} disabled={stock <= 0}>{p.name} ({stock} {L('left', 'متبقي')})</option>;
+              return <option key={p.id} value={p.id} disabled={stock <= 0}>{giupName(p, lang)} ({stock} {L('left', 'متبقي')})</option>;
             })}
           </select>
           <div className="g-form-row">
@@ -301,9 +339,12 @@ const GiupSales = ({ g, addItem, delItem, L }) => {
           const p = (g.products || []).find(x => x.id === s.productId);
           return (
             <div key={s.id} className="g-list-row">
-              <div className="g-list-main">
-                <div className="g-list-name">{p ? p.name : L('Deleted product', 'منتج محذوف')}</div>
-                <div className="g-list-sub">{gMoney(s.price)} × {s.qty} · {s.date}</div>
+              <div className="g-list-main g-list-withimg">
+                {p && p.image && <img className="g-thumb" src={p.image} alt="" />}
+                <div style={{ minWidth: 0 }}>
+                  <div className="g-list-name">{p ? giupName(p, lang) : L('Deleted product', 'منتج محذوف')}</div>
+                  <div className="g-list-sub">{gMoney(s.price)} × {s.qty} · {s.date}</div>
+                </div>
               </div>
               <div className="g-list-side">
                 <span className="g-amount" style={{ color: '#12996a' }}>+{gMoney(s.price * s.qty)}</span>
@@ -373,21 +414,28 @@ const GiupExpenses = ({ g, addItem, delItem, update, L }) => {
 
 /* ============ ADS ============ */
 const GiupAds = ({ g, addItem, delItem, L }) => {
-  const [platform, setPlatform] = gUS('Facebook');
+  const PLATFORMS = ['Facebook', 'Instagram', 'TikTok', 'Google'];
+  const [platforms, setPlatforms] = gUS([]);
   const [cost, setCost] = gUS('');
   const [date, setDate] = gUS(gToday());
   const [note, setNote] = gUS('');
 
+  const togglePlatform = (p) => {
+    setPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  };
+
   const save = () => {
     if (!(parseFloat(cost) > 0)) return;
+    if (platforms.length === 0) return;
     addItem('ads', {
       id: Date.now().toString(),
-      platform,
+      platforms: [...platforms],
+      platform: platforms.join('، '),
       cost: parseFloat(cost) || 0,
       date: date || gToday(),
       note: note.trim(),
     });
-    setCost(''); setNote(''); setDate(gToday());
+    setPlatforms([]); setCost(''); setNote(''); setDate(gToday());
   };
   const sorted = [...(g.ads || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -396,14 +444,20 @@ const GiupAds = ({ g, addItem, delItem, L }) => {
       <div className="g-card">
         <div className="g-card-title">➕ {L('Add ad spend', 'أضف مصروف إعلان')}</div>
         <div className="g-form">
-          <div className="g-form-row">
-            <select className="g-input" value={platform} onChange={e => setPlatform(e.target.value)}>
-              <option>Facebook</option><option>Instagram</option><option>TikTok</option>
-              <option>Google</option><option>{L('Other', 'أخرى')}</option>
-            </select>
-            <input className="g-input" type="number" placeholder={L('Cost', 'التكلفة')} value={cost} onChange={e => setCost(e.target.value)} />
+          <div className="g-check-label">{L('Platforms (choose one or more)', 'المنصات (اختر واحدة أو أكثر)')}</div>
+          <div className="g-checks">
+            {PLATFORMS.map(p => (
+              <button key={p} type="button"
+                className={'g-check' + (platforms.includes(p) ? ' on' : '')}
+                onClick={() => togglePlatform(p)}>
+                <span className="g-check-box">{platforms.includes(p) ? '✓' : ''}</span>{p}
+              </button>
+            ))}
           </div>
-          <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <div className="g-form-row">
+            <input className="g-input" type="number" placeholder={L('Cost', 'التكلفة')} value={cost} onChange={e => setCost(e.target.value)} />
+            <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
           <input className="g-input" placeholder={L('Note (optional)', 'ملاحظة (اختياري)')} value={note} onChange={e => setNote(e.target.value)} />
           <button className="g-btn-primary" onClick={save}>{L('Save ad', 'حفظ الإعلان')}</button>
         </div>
@@ -429,7 +483,7 @@ const GiupAds = ({ g, addItem, delItem, L }) => {
 };
 
 /* ============ REPORTS ============ */
-const GiupReports = ({ g, totals, inPeriod, L }) => {
+const GiupReports = ({ g, totals, inPeriod, L, lang }) => {
   // profit per product
   const perProduct = gUM(() => {
     return (g.products || []).map(p => {
@@ -437,7 +491,7 @@ const GiupReports = ({ g, totals, inPeriod, L }) => {
       const revenue = sales.reduce((a, s) => a + s.price * s.qty, 0);
       const unitsSold = sales.reduce((a, s) => a + s.qty, 0);
       const cogs = unitsSold * p.buyPrice;
-      return { name: p.name, unitsSold, revenue, profit: revenue - cogs };
+      return { name: giupName(p, lang), unitsSold, revenue, profit: revenue - cogs };
     }).filter(x => x.unitsSold > 0).sort((a, b) => b.profit - a.profit);
   }, [g, inPeriod]);
 

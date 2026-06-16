@@ -1417,3 +1417,69 @@ body.lightbox-open {
   .giup-subtab{ font-size: 13px; padding: 8px 13px; }
   .g-form-row{ flex-direction: column; }
 }
+
+/* ============ JUYUB Biz — enhanced visuals ============ */
+/* Stat cards: gradient accent + larger */
+.giup-stats .g-stat{
+  position: relative; overflow: hidden;
+  background: linear-gradient(145deg, #fff 0%, #FBF4F5 100%);
+  border: 1px solid #EADBDB;
+  box-shadow: 0 6px 20px -12px rgba(122,31,53,.25);
+  border-radius: 18px; padding: 20px 18px;
+}
+.giup-stats .g-stat::before{
+  content:''; position:absolute; top:0; inset-inline-start:0;
+  width: 100%; height: 3px;
+  background: linear-gradient(90deg, #7A1F35, #A8324F);
+}
+.g-stat-label{ text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+.g-stat-value{ font-size: clamp(20px, 2.6vw, 28px); }
+
+/* Product pick preview */
+.g-pick-preview{
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; border-radius: 12px;
+  background: #FBF4F5; border: 1px solid #EADBDB;
+}
+.g-pick-preview img{
+  width: 56px; height: 56px; object-fit: contain;
+  border-radius: 10px; background: #fff; border: 1px solid #EADBDB; flex-shrink: 0;
+}
+.g-pick-name{ font-size: 15px; font-weight: 700; color: var(--ink); }
+.g-pick-sub{ font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+
+/* List item thumbnail */
+.g-list-withimg{ display: flex; align-items: center; gap: 12px; }
+.g-thumb{
+  width: 48px; height: 48px; object-fit: contain;
+  border-radius: 10px; background: #fff; border: 1px solid #EADBDB; flex-shrink: 0;
+}
+
+/* Checkbox pills (ads) */
+.g-check-label{ font-size: 13px; color: var(--ink-soft); font-weight: 600; margin-bottom: -2px; }
+.g-checks{ display: flex; flex-wrap: wrap; gap: 8px; }
+.g-check{
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--bg);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  color: var(--ink-soft); cursor: pointer; transition: .18s;
+}
+.g-check:hover{ border-color: #A8324F; }
+.g-check.on{
+  background: linear-gradient(135deg, #7A1F35, #A8324F);
+  border-color: transparent; color: #fff;
+  box-shadow: 0 6px 14px -6px rgba(122,31,53,.4);
+}
+.g-check-box{
+  width: 18px; height: 18px; border-radius: 5px;
+  border: 1.5px solid currentColor; display: grid; place-items: center;
+  font-size: 11px; flex-shrink: 0;
+}
+.g-check.on .g-check-box{ background: rgba(255,255,255,.2); }
+
+/* Chart card a touch taller and framed */
+.g-card svg{ margin-top: 4px; }
+
+/* Profit-per-product rank highlight */
+.giup-panel .g-card-title{ font-size: 14px; }

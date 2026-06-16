@@ -98,11 +98,12 @@ const giupStock = (g, productId) => {
   return p.qty - sold;
 };
 
-/* ---------- localized product name ---------- */
+/* ---------- localized product name (with color if present) ---------- */
 const giupName = (p, lang) => {
   if (!p) return '';
-  if (lang === 'ar') return p.nameAr || p.name || p.nameEn || '';
-  return p.nameEn || p.name || p.nameAr || '';
+  const base = lang === 'ar' ? (p.nameAr || p.name || p.nameEn || '') : (p.nameEn || p.name || p.nameAr || '');
+  const color = p.colorEn ? (lang === 'ar' ? (p.colorAr || p.colorEn) : p.colorEn) : '';
+  return color ? `${base} — ${color}` : base;
 };
 
 /* ============ HOME ============ */
@@ -192,44 +193,64 @@ const GiupProfitChart = ({ g, L, lang }) => {
 };
 
 /* ============ PRODUCTS ============ */
-const GiupProducts = ({ g, addItem, delItem, L }) => {
-  const { products: siteProducts, lang } = useStore();
+const GiupProducts = ({ g, addItem, delItem, L, lang: panelLang }) => {
+  const { products: siteProducts, lang, saveGiup, giup } = useStore();
   const [pickId, setPickId] = gUS('');
   const [buyPrice, setBuy] = gUS('');
   const [sellPrice, setSell] = gUS('');
-  const [qty, setQty] = gUS('');
+  const [date, setDate] = gUS(gToday());
+  const [colorQty, setColorQty] = gUS({}); // { colorEn: qty }
 
   const picked = (siteProducts || []).find(p => p.id === pickId);
   const pickedImg = picked && picked.variants && picked.variants[0] ? picked.variants[0].img : null;
   const pickedName = picked ? (lang === 'ar' ? picked.name.ar : picked.name.en) : '';
+  const variants = picked ? (picked.variants || []) : [];
 
   const onPick = (id) => {
     setPickId(id);
+    setColorQty({});
     const p = (siteProducts || []).find(x => x.id === id);
-    if (p && !sellPrice) setSell(String(p.price || ''));
+    if (p) setSell(String(p.price || ''));
+  };
+
+  const setQtyFor = (colorEn, val) => {
+    setColorQty(prev => ({ ...prev, [colorEn]: val }));
   };
 
   const save = () => {
     if (!picked) return;
-    if (!(parseInt(qty) > 0)) return;
-    addItem('products', {
-      id: Date.now().toString(),
-      siteId: picked.id,
-      name: pickedName,
-      nameEn: picked.name.en,
-      nameAr: picked.name.ar,
-      buyPrice: parseFloat(buyPrice) || 0,
-      sellPrice: parseFloat(sellPrice) || (picked.price || 0),
-      qty: parseInt(qty) || 0,
-      image: pickedImg,
-      createdAt: new Date().toISOString(),
-    });
-    setPickId(''); setBuy(''); setSell(''); setQty('');
+    // build one inventory entry per color that has qty > 0
+    const entries = variants
+      .map(v => {
+        const q = parseInt(colorQty[v.color.en]) || 0;
+        if (q <= 0) return null;
+        return {
+          id: Date.now().toString() + '-' + v.color.en,
+          siteId: picked.id,
+          name: pickedName,
+          nameEn: picked.name.en,
+          nameAr: picked.name.ar,
+          colorEn: v.color.en,
+          colorAr: v.color.ar,
+          colorHex: v.color.hex,
+          buyPrice: parseFloat(buyPrice) || 0,
+          sellPrice: parseFloat(sellPrice) || (picked.price || 0),
+          qty: q,
+          image: v.img || pickedImg,
+          date: date || gToday(),
+          createdAt: new Date().toISOString(),
+        };
+      })
+      .filter(Boolean);
+
+    if (entries.length === 0) { alert(L('Enter quantity for at least one color', 'أدخل كمية للون واحد على الأقل')); return; }
+
+    saveGiup({ ...giup, products: [...(giup.products || []), ...entries] });
+    setPickId(''); setBuy(''); setSell(''); setColorQty({}); setDate(gToday());
   };
 
-  // products on the website not yet added to inventory
+  const totalToAdd = variants.reduce((a, v) => a + (parseInt(colorQty[v.color.en]) || 0), 0);
   const availableToAdd = (siteProducts || []);
-
   const imgOf = (p) => (p.variants && p.variants[0] ? p.variants[0].img : null);
 
   return (
@@ -251,20 +272,42 @@ const GiupProducts = ({ g, addItem, delItem, L }) => {
           </div>
 
           {picked && (
-            <div className="g-pick-selected">
-              {pickedImg && <img src={pickedImg} alt="" />}
-              <div>
-                <div className="g-pick-name">{pickedName}</div>
-                <div className="g-pick-sub">{L('Selected', 'تم الاختيار')} · {L('Store price', 'سعر المتجر')}: {gMoney(picked.price)}</div>
+            <>
+              <div className="g-pick-selected">
+                {pickedImg && <img src={pickedImg} alt="" />}
+                <div>
+                  <div className="g-pick-name">{pickedName}</div>
+                  <div className="g-pick-sub">{L('Store price', 'سعر المتجر')}: {gMoney(picked.price)}</div>
+                </div>
               </div>
-            </div>
+
+              {/* Color quantities */}
+              <div className="g-pick-label">{L('Quantity per color you bought', 'الكمية لكل لون اشتريته')}</div>
+              <div className="g-color-list">
+                {variants.map(v => (
+                  <div key={v.color.en} className={'g-color-row' + ((parseInt(colorQty[v.color.en]) || 0) > 0 ? ' on' : '')}>
+                    <span className="g-color-dot" style={{ background: v.color.hex }} />
+                    <span className="g-color-name">{lang === 'ar' ? v.color.ar : v.color.en}</span>
+                    <input className="g-color-qty" type="number" min="0" placeholder="0"
+                      value={colorQty[v.color.en] || ''}
+                      onChange={e => setQtyFor(v.color.en, e.target.value)} />
+                  </div>
+                ))}
+              </div>
+              {totalToAdd > 0 && (
+                <div className="g-total-hint">{L('Total to add', 'الإجمالي للإضافة')}: <strong>{totalToAdd} {L('pcs', 'قطعة')}</strong></div>
+              )}
+            </>
           )}
 
           <div className="g-form-row">
             <input className="g-input" type="number" placeholder={L('Buy price (cost)', 'سعر الشراء (التكلفة)')} value={buyPrice} onChange={e => setBuy(e.target.value)} />
             <input className="g-input" type="number" placeholder={L('Sell price', 'سعر البيع')} value={sellPrice} onChange={e => setSell(e.target.value)} />
           </div>
-          <input className="g-input" type="number" placeholder={L('Quantity bought', 'الكمية المشتراة')} value={qty} onChange={e => setQty(e.target.value)} />
+          <div className="g-field">
+            <label className="g-pick-label">{L('Purchase date', 'تاريخ الشراء')}</label>
+            <input className="g-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
           <button className="g-btn-primary" onClick={save}>{L('Add to inventory', 'أضف للمخزون')}</button>
         </div>
       </div>
@@ -277,16 +320,21 @@ const GiupProducts = ({ g, addItem, delItem, L }) => {
           const stock = giupStock(g, p.id);
           const margin = p.sellPrice - p.buyPrice;
           const dispName = p.nameAr && lang === 'ar' ? p.nameAr : (p.nameEn || p.name);
+          const colorName = p.colorEn ? (lang === 'ar' ? (p.colorAr || p.colorEn) : p.colorEn) : null;
           return (
             <div key={p.id} className="g-list-row">
               <div className="g-list-main g-list-withimg">
                 {p.image && <img className="g-thumb" src={p.image} alt="" />}
                 <div style={{ minWidth: 0 }}>
-                  <div className="g-list-name">{dispName}</div>
+                  <div className="g-list-name">
+                    {dispName}
+                    {colorName && <span className="g-color-tag"><span className="g-color-dot sm" style={{ background: p.colorHex }} />{colorName}</span>}
+                  </div>
                   <div className="g-list-sub">
                     {L('Buy', 'شراء')}: {gMoney(p.buyPrice)} · {L('Sell', 'بيع')}: {gMoney(p.sellPrice)} ·
                     <span style={{ color: margin >= 0 ? '#12996a' : '#c0392b' }}> {L('Margin', 'الهامش')}: {gMoney(margin)}</span>
                   </div>
+                  {p.date && <div className="g-list-sub">{L('Bought', 'تاريخ الشراء')}: {p.date}</div>}
                 </div>
               </div>
               <div className="g-list-side">

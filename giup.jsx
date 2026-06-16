@@ -34,7 +34,7 @@ const GDateField = ({ value, onChange, lang }) => {
         {years.map(yy => <option key={yy} value={yy}>{yy}</option>)}
       </select>
       <select className="g-input" style={sel} value={m} onChange={e => set(y, e.target.value, d)}>
-        {months.map(mm => <option key={mm} value={mm}>{lang === 'ar' ? 'شهر ' + Number(mm) : 'M' + Number(mm)}</option>)}
+        {months.map(mm => <option key={mm} value={mm}>{lang === 'ar' ? 'شهر ' + Number(mm) : Number(mm)}</option>)}
       </select>
       <select className="g-input" style={sel} value={d} onChange={e => set(y, m, e.target.value)}>
         {days.map(dd => <option key={dd} value={dd}>{Number(dd)}</option>)}

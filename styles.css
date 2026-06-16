@@ -1534,3 +1534,40 @@ body.lightbox-open {
   .g-pick-grid{ grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; max-height: 300px; }
   .g-pick-cap{ font-size: 11.5px; }
 }
+
+/* ============ Giup color quantities ============ */
+.g-color-list{ display: flex; flex-direction: column; gap: 8px; }
+.g-color-row{
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--bg);
+  transition: .18s;
+}
+.g-color-row.on{ border-color: #A8324F; background: #FBF4F5; }
+.g-color-dot{
+  width: 22px; height: 22px; border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); flex-shrink: 0;
+}
+.g-color-dot.sm{ width: 12px; height: 12px; display: inline-block; vertical-align: middle; }
+.g-color-name{ flex: 1; font-size: 14px; font-weight: 600; color: var(--ink); }
+.g-color-qty{
+  width: 80px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: #fff;
+  font-family: inherit; font-size: 15px; text-align: center; color: var(--ink);
+}
+.g-color-qty:focus{ outline: none; border-color: #A8324F; box-shadow: 0 0 0 3px rgba(168,50,79,.14); }
+
+/* color tag next to product name in inventory/sales */
+.g-color-tag{
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-inline-start: 8px; padding: 2px 9px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line);
+  font-size: 11.5px; font-weight: 600; color: var(--ink-soft);
+}
+
+.g-total-hint{
+  font-size: 13px; color: var(--ink-soft); text-align: center;
+  padding: 4px; background: #FBF4F5; border-radius: 8px;
+}
+.g-field{ display: flex; flex-direction: column; gap: 6px; }
+.g-field .g-pick-label{ margin: 0; }

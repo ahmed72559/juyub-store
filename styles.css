@@ -1581,3 +1581,9 @@ body.lightbox-open {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 11px; font-weight: 600; color: var(--ink-soft);
 }
+
+/* ============ Giup month picker ============ */
+.giup-period-wrap{ display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.giup-period-wrap .giup-period{ margin-bottom: 0; }
+.giup-month-pick{ display: flex; gap: 8px; }
+.giup-month-pick .g-input{ width: auto; min-width: 90px; padding: 8px 12px; }

@@ -1483,3 +1483,54 @@ body.lightbox-open {
 
 /* Profit-per-product rank highlight */
 .giup-panel .g-card-title{ font-size: 14px; }
+
+/* ============ Giup visual product picker ============ */
+.g-pick-label{ font-size: 13px; color: var(--ink-soft); font-weight: 600; margin-bottom: -2px; }
+.g-pick-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  max-height: 360px; overflow-y: auto;
+  padding: 2px;
+}
+.g-pick-card{
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 8px; border-radius: 14px;
+  border: 1.5px solid var(--line); background: var(--bg);
+  cursor: pointer; transition: .18s; font-family: inherit;
+}
+.g-pick-card:hover{ border-color: #A8324F; transform: translateY(-2px); box-shadow: 0 8px 18px -10px rgba(122,31,53,.3); }
+.g-pick-card.on{
+  border-color: #7A1F35; background: #FBF4F5;
+  box-shadow: 0 8px 20px -8px rgba(122,31,53,.35);
+}
+.g-pick-img{
+  width: 100%; aspect-ratio: 1/1; border-radius: 10px;
+  background: #fff; border: 1px solid #EADBDB;
+  display: grid; place-items: center; overflow: hidden;
+}
+.g-pick-img img{ width: 88%; height: 88%; object-fit: contain; }
+.g-pick-img span{ font-size: 28px; }
+.g-pick-cap{
+  font-size: 12.5px; font-weight: 700; color: var(--ink);
+  text-align: center; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.g-pick-price{ font-size: 12px; font-weight: 700; color: #A8324F; }
+
+/* Selected confirmation strip */
+.g-pick-selected{
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(122,31,53,.06), rgba(168,50,79,.04));
+  border: 1px solid #EADBDB;
+}
+.g-pick-selected img{
+  width: 52px; height: 52px; object-fit: contain;
+  border-radius: 10px; background: #fff; border: 1px solid #EADBDB; flex-shrink: 0;
+}
+
+@media(max-width:860px){
+  .g-pick-grid{ grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; max-height: 300px; }
+  .g-pick-cap{ font-size: 11.5px; }
+}

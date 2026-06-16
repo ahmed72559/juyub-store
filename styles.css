@@ -1571,3 +1571,7 @@ body.lightbox-open {
 }
 .g-field{ display: flex; flex-direction: column; gap: 6px; }
 .g-field .g-pick-label{ margin: 0; }
+
+/* ============ Giup date field (Year / Month / Day) ============ */
+.g-date-field{ display: flex; gap: 8px; }
+.g-date-field select{ cursor: pointer; }

@@ -77,9 +77,13 @@ const GiupPanel = () => {
 
   // ---- totals ----
   const totals = gUM(() => {
+    console.log('🔍 GIUP DEBUG — raw g:', JSON.stringify(g));
+    console.log('🔍 sales:', g.sales, 'isArray:', Array.isArray(g.sales));
+    console.log('🔍 fromDate:', fromDate, 'period:', period);
     const sales = (g.sales || []).filter(s => inPeriod(s.date)).reduce((a, x) => a + x.price * x.qty, 0);
     const exp = (g.expenses || []).filter(e => inPeriod(e.date)).reduce((a, x) => a + x.price * x.qty, 0);
     const ads = (g.ads || []).filter(a => inPeriod(a.date)).reduce((a, x) => a + x.cost, 0);
+    console.log('🔍 computed sales:', sales, 'exp:', exp, 'ads:', ads);
     const prodCost = period === 'all' ? (g.products || []).reduce((a, p) => a + p.buyPrice * p.qty, 0) : 0;
     const totalExp = exp + ads + prodCost;
     return { sales, exp, ads, prodCost, totalExp, profit: sales - totalExp };

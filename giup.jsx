@@ -10,11 +10,17 @@ const { useState: gUS, useMemo: gUM } = React;
      expenseCategories: [string]
 ==========================================================*/
 
-const gMoney = (n) => Math.round(n).toLocaleString('ar-EG') + ' ج.م';
+let giupLang = 'en';
+const gMoney = (n) => {
+  const v = Math.round(n);
+  if (giupLang === 'ar') return v.toLocaleString('ar-EG') + ' ج.م';
+  return v.toLocaleString('en-US') + ' EGP';
+};
 const gToday = () => new Date().toISOString().split('T')[0];
 
 const GiupPanel = () => {
   const { giup, saveGiup, lang } = useStore();
+  giupLang = lang; // keep module-level money formatter in sync
   const [sub, setSub] = gUS('home');
   const [period, setPeriod] = gUS('month');
   const L = (en, ar) => (lang === 'ar' ? ar : en);
@@ -115,7 +121,7 @@ const GiupHome = ({ g, totals, L, lang }) => {
         {stat(L('Net profit', 'صافي الربح'), totals.profit, totals.profit >= 0 ? '#12996a' : '#c0392b')}
       </div>
 
-      <GiupProfitChart g={g} L={L} />
+      <GiupProfitChart g={g} L={L} lang={lang} />
 
       <div className="g-card">
         <div className="g-card-title">📦 {L('Stock', 'المخزون')}</div>
@@ -139,7 +145,8 @@ const GiupHome = ({ g, totals, L, lang }) => {
 };
 
 /* ---------- Profit chart (last 7 days) — SVG ---------- */
-const GiupProfitChart = ({ g, L }) => {
+const GiupProfitChart = ({ g, L, lang }) => {
+  const loc = lang === 'ar' ? 'ar-EG' : 'en-US';
   const data = gUM(() => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
@@ -148,10 +155,10 @@ const GiupProfitChart = ({ g, L }) => {
       const sales = (g.sales || []).filter(x => x.date === ds).reduce((s, x) => s + x.price * x.qty, 0);
       const exp = (g.expenses || []).filter(x => x.date === ds).reduce((s, x) => s + x.price * x.qty, 0)
         + (g.ads || []).filter(x => x.date === ds).reduce((s, x) => s + x.cost, 0);
-      days.push({ label: d.toLocaleDateString('ar-EG', { weekday: 'short' }), profit: sales - exp });
+      days.push({ label: d.toLocaleDateString(loc, { weekday: 'short' }), profit: sales - exp });
     }
     return days;
-  }, [g]);
+  }, [g, loc]);
 
   const W = 600, H = 180, pad = { t: 16, b: 28, l: 12, r: 12 };
   const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
@@ -223,24 +230,32 @@ const GiupProducts = ({ g, addItem, delItem, L }) => {
   // products on the website not yet added to inventory
   const availableToAdd = (siteProducts || []);
 
+  const imgOf = (p) => (p.variants && p.variants[0] ? p.variants[0].img : null);
+
   return (
     <>
       <div className="g-card">
         <div className="g-card-title">➕ {L('Add a product you bought', 'أضف منتج اشتريته')}</div>
         <div className="g-form">
-          <select className="g-input" value={pickId} onChange={e => onPick(e.target.value)}>
-            <option value="">{L('— choose from store products —', '— اختر من منتجات المتجر —')}</option>
+          <div className="g-pick-label">{L('Choose a product from the store', 'اختر منتج من المتجر')}</div>
+          <div className="g-pick-grid">
             {availableToAdd.map(p => (
-              <option key={p.id} value={p.id}>{lang === 'ar' ? p.name.ar : p.name.en} — {p.sku}</option>
+              <button key={p.id} type="button"
+                className={'g-pick-card' + (pickId === p.id ? ' on' : '')}
+                onClick={() => onPick(p.id)}>
+                <div className="g-pick-img">{imgOf(p) ? <img src={imgOf(p)} alt="" /> : <span>🛍️</span>}</div>
+                <div className="g-pick-cap">{lang === 'ar' ? p.name.ar : p.name.en}</div>
+                <div className="g-pick-price">{gMoney(p.price)}</div>
+              </button>
             ))}
-          </select>
+          </div>
 
           {picked && (
-            <div className="g-pick-preview">
+            <div className="g-pick-selected">
               {pickedImg && <img src={pickedImg} alt="" />}
               <div>
                 <div className="g-pick-name">{pickedName}</div>
-                <div className="g-pick-sub">{L('Store price', 'سعر المتجر')}: {gMoney(picked.price)}</div>
+                <div className="g-pick-sub">{L('Selected', 'تم الاختيار')} · {L('Store price', 'سعر المتجر')}: {gMoney(picked.price)}</div>
               </div>
             </div>
           )}

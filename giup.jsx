@@ -61,11 +61,19 @@ const GiupPanel = () => {
   // ---- period filter ----
   const fromDate = gUM(() => {
     const now = new Date();
-    if (period === 'week') { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
-    if (period === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
-    return new Date(2000, 0, 1);
+    if (period === 'week') {
+      const d = new Date(now); d.setDate(d.getDate() - 7);
+      return d.toISOString().split('T')[0]; // 'YYYY-MM-DD' string
+    }
+    if (period === 'month') {
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      return `${now.getFullYear()}-${m}-01`;
+    }
+    return '2000-01-01';
   }, [period]);
-  const inPeriod = (d) => !d || new Date(d) >= fromDate;
+
+  // Compare date strings directly (YYYY-MM-DD lexicographic = chronological)
+  const inPeriod = (d) => !d || d >= fromDate;
 
   // ---- totals ----
   const totals = gUM(() => {

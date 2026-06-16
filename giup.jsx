@@ -47,7 +47,10 @@ const GiupPanel = () => {
   const { giup, saveGiup, lang, toast } = useStore();
   giupLang = lang; // keep module-level money formatter in sync
   const [sub, setSub] = gUS('home');
-  const [period, setPeriod] = gUS('month');
+  const [period, setPeriod] = gUS('all');
+  const now0 = new Date();
+  const [selMonth, setSelMonth] = gUS(String(now0.getMonth() + 1).padStart(2, '0'));
+  const [selYear, setSelYear] = gUS(String(now0.getFullYear()));
   const L = (en, ar) => (lang === 'ar' ? ar : en);
 
   const g = giup || { products: [], sales: [], expenses: [], ads: [], expenseCategories: [] };
@@ -58,36 +61,34 @@ const GiupPanel = () => {
   const addMany = (key, items) => { update({ [key]: [...(g[key] || []), ...items] }); toast(L('Saved ✓', 'تم الحفظ ✓')); };
   const delItem = (key, id) => { update({ [key]: (g[key] || []).filter(x => x.id !== id) }); toast(L('Deleted', 'تم الحذف')); };
 
-  // ---- period filter ----
-  const fromDate = gUM(() => {
+  // ---- period filter (returns [from, to] inclusive date-string range) ----
+  const range = gUM(() => {
     const now = new Date();
     if (period === 'week') {
       const d = new Date(now); d.setDate(d.getDate() - 7);
-      return d.toISOString().split('T')[0]; // 'YYYY-MM-DD' string
+      return [d.toISOString().split('T')[0], '9999-12-31'];
     }
     if (period === 'month') {
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      return `${now.getFullYear()}-${m}-01`;
+      const from = `${selYear}-${selMonth}-01`;
+      const to = `${selYear}-${selMonth}-31`;
+      return [from, to];
     }
-    return '2000-01-01';
-  }, [period]);
+    return ['2000-01-01', '9999-12-31']; // all
+  }, [period, selMonth, selYear]);
 
   // Compare date strings directly (YYYY-MM-DD lexicographic = chronological)
-  const inPeriod = (d) => !d || d >= fromDate;
+  const inPeriod = (d) => !d || (d >= range[0] && d <= range[1]);
 
   // ---- totals ----
   const totals = gUM(() => {
-    console.log('🔍 GIUP DEBUG — raw g:', JSON.stringify(g));
-    console.log('🔍 sales:', g.sales, 'isArray:', Array.isArray(g.sales));
-    console.log('🔍 fromDate:', fromDate, 'period:', period);
     const sales = (g.sales || []).filter(s => inPeriod(s.date)).reduce((a, x) => a + x.price * x.qty, 0);
     const exp = (g.expenses || []).filter(e => inPeriod(e.date)).reduce((a, x) => a + x.price * x.qty, 0);
     const ads = (g.ads || []).filter(a => inPeriod(a.date)).reduce((a, x) => a + x.cost, 0);
-    console.log('🔍 computed sales:', sales, 'exp:', exp, 'ads:', ads);
-    const prodCost = period === 'all' ? (g.products || []).reduce((a, p) => a + p.buyPrice * p.qty, 0) : 0;
+    // product purchase cost counted in the period it was bought
+    const prodCost = (g.products || []).filter(p => inPeriod(p.date)).reduce((a, p) => a + p.buyPrice * p.qty, 0);
     const totalExp = exp + ads + prodCost;
     return { sales, exp, ads, prodCost, totalExp, profit: sales - totalExp };
-  }, [g, period, fromDate]);
+  }, [g, range]);
 
   const tabs = [
     ['home', '🏠', L('Home', 'الرئيسية')],
@@ -111,10 +112,26 @@ const GiupPanel = () => {
 
       {/* Period toggle (home + reports) */}
       {(sub === 'home' || sub === 'reports') && (
-        <div className="giup-period">
-          {[['week', L('Week', 'أسبوع')], ['month', L('Month', 'شهر')], ['all', L('All', 'الكل')]].map(([id, label]) => (
-            <button key={id} className={period === id ? 'active' : ''} onClick={() => setPeriod(id)}>{label}</button>
-          ))}
+        <div className="giup-period-wrap">
+          <div className="giup-period">
+            {[['week', L('Week', 'أسبوع')], ['month', L('Month', 'شهر')], ['all', L('All', 'الكل')]].map(([id, label]) => (
+              <button key={id} className={period === id ? 'active' : ''} onClick={() => setPeriod(id)}>{label}</button>
+            ))}
+          </div>
+          {period === 'month' && (
+            <div className="giup-month-pick">
+              <select className="g-input" value={selMonth} onChange={e => setSelMonth(e.target.value)}>
+                {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(mm => (
+                  <option key={mm} value={mm}>{lang === 'ar' ? 'شهر ' + Number(mm) : Number(mm)}</option>
+                ))}
+              </select>
+              <select className="g-input" value={selYear} onChange={e => setSelYear(e.target.value)}>
+                {Array.from({ length: 7 }, (_, i) => String(now0.getFullYear() - i)).map(yy => (
+                  <option key={yy} value={yy}>{yy}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 

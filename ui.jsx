@@ -312,9 +312,6 @@ const Footer = () => {
             ))}
           </div>
         )}
-        <button className="ftr-admin" onClick={() => isAdmin ? navigate('admin') : setLoginOpen(true)}>
-          <Icon n="lock" style={{ width: 14 }} />{isAdmin ? t({ en: 'Dashboard', ar: 'لوحة التحكم' }) : t({ en: 'Owner login', ar: 'دخول المالك' })}
-        </button>
       </div>
 
       {/* MOBILE bottom bar — hidden on desktop */}
@@ -327,11 +324,6 @@ const Footer = () => {
               ))}
             </div>
           )}
-          <button className="ftr-admin-icon"
-            onClick={() => isAdmin ? navigate('admin') : setLoginOpen(true)}
-            title={isAdmin ? t({ en: 'Dashboard', ar: 'لوحة التحكم' }) : t({ en: 'Owner login', ar: 'دخول المالك' })}>
-            <Icon n="lock" style={{ width: 15, height: 15 }} />
-          </button>
         </div>
         <div className="ftr-copy">
           <span>{t(fc.founded) ? t(fc.founded) : <>© {new Date().getFullYear()} JUYUB</>}</span>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JUYUB</title>
+  <script>
+    // GitHub Pages serves this 404 page for any path that isn't a real file.
+    // We translate the path (e.g. /admin) into the app's hash route (/#/admin)
+    // and redirect to the SPA entry point so client-side routing can take over.
+    (function () {
+      var path = window.location.pathname.replace(/^\/+/, ''); // strip leading slash
+      var search = window.location.search || '';
+      // Known client routes that should map to a hash route
+      var known = ['admin', 'shop', 'about', 'shipping', 'faq', 'checkout', 'confirm'];
+      var first = path.split('/')[0];
+      if (known.indexOf(first) !== -1) {
+        window.location.replace('/#/' + path + search);
+      } else {
+        window.location.replace('/');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <p>Redirecting…</p>
+</body>
+</html>

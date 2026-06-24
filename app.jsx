@@ -256,6 +256,11 @@ function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  // Visiting /admin (or #/admin) while logged out → prompt the login modal
+  aUE(() => {
+    if (route.name === 'admin' && !isAdmin) setLoginOpen(true);
+  }, [route.name, isAdmin]);
+
   const navigate = useCallback((name, params = {}) => {
     let h = '#/' + (name === 'home' ? '' : name);
     if (name === 'product' && params.id) h = '#/product/' + params.id;
